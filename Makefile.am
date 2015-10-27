@@ -1297,8 +1297,11 @@ OUTPUT_API_SRC = \
 
 liboutput_plugins_a_SOURCES = \
 	src/output/Timer.cxx src/output/Timer.hxx \
+	src/output/plugins/MulticastOutputPlugin.cxx \
+	src/output/plugins/MulticastOutputPlugin.hxx \
 	src/output/plugins/NullOutputPlugin.cxx \
 	src/output/plugins/NullOutputPlugin.hxx
+
 
 MIXER_LIBS = \
 	libmixer_plugins.a \
