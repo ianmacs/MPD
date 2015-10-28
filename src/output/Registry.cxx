@@ -27,6 +27,7 @@
 #include "plugins/HaikuOutputPlugin.hxx"
 #include "plugins/JackOutputPlugin.hxx"
 #include "plugins/NullOutputPlugin.hxx"
+#include "plugins/MulticastOutputPlugin.hxx"
 #include "plugins/OpenALOutputPlugin.hxx"
 #include "plugins/OssOutputPlugin.hxx"
 #include "plugins/OSXOutputPlugin.hxx"
@@ -94,6 +95,7 @@ const AudioOutputPlugin *const audio_output_plugins[] = {
 #ifdef ENABLE_WINMM_OUTPUT
 	&winmm_output_plugin,
 #endif
+	&multicast_output_plugin,
 	nullptr
 };
 
