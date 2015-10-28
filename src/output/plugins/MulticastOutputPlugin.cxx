@@ -25,6 +25,7 @@
 #include "../OutputAPI.hxx"
 #include "../Wrapper.hxx"
 #include "../Timer.hxx"
+#include "SoundSender.hh"
 
 class MulticastOutput {
 	friend struct AudioOutputWrapper<MulticastOutput>;
