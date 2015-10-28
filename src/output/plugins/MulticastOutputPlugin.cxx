@@ -32,13 +32,15 @@ class MulticastOutput {
 
 	AudioOutput base;
 
-	bool sync;
+	SoundSender::Pacer *pacer;
 
-	Timer *timer;
-
+	unsigned incomplete_data_bytes;
 public:
 	MulticastOutput()
-		:base(multicast_output_plugin) {}
+		: base(multicast_output_plugin),
+		  pacer(0),
+		  incomplete_data_bytes(0)
+	{}
 
 	bool Initialize(const ConfigBlock &block, Error &error) {
 		return base.Configure(block, error);
@@ -47,37 +49,41 @@ public:
 	static MulticastOutput *Create(const ConfigBlock &block, Error &error);
 
 	bool Open(AudioFormat &audio_format, gcc_unused Error &error) {
-		if (sync)
-			timer = new Timer(audio_format);
-
+		if (audio_format.format != SampleFormat::S16)
+			return false;
+		if (audio_format.channels != 2U)
+			return false;
+		if (audio_format.sample_rate != 48000U)
+			return false;
+		SoundSender::Clock::nsec_t period = 256000000000 / 48000;
+		pacer = new SoundSender::Pacer(SoundSender::Clock{},
+					       period,
+					       period/2);
 		return true;
 	}
 
 	void Close() {
-		if (sync)
-			delete timer;
+		delete pacer;
+		pacer = 0;
 	}
 
 	unsigned Delay() const {
-		return sync && timer->IsStarted()
-			? timer->GetDelay()
-			: 0;
+		return pacer->get_sleeptime();
 	}
 
 	size_t Play(gcc_unused const void *chunk, size_t size,
 		    gcc_unused Error &error) {
-		if (sync) {
-			if (!timer->IsStarted())
-				timer->Start();
-			timer->Add(size);
+		if ((size + incomplete_data_bytes) < (2*2*256)) {
+			incomplete_data_bytes += size;
+			return size;
 		}
-
-		return size;
+		unsigned old_incomplete_data_bytes = incomplete_data_bytes;
+	        incomplete_data_bytes = 0;
+		pacer->trigger();
+		return 2*2*256 - old_incomplete_data_bytes;
 	}
 
 	void Cancel() {
-		if (sync)
-			timer->Reset();
 	}
 };
 
@@ -90,8 +96,6 @@ MulticastOutput::Create(const ConfigBlock &block, Error &error)
 		delete nd;
 		return nullptr;
 	}
-
-	nd->sync = block.GetBlockValue("sync", true);
 
 	return nd;
 }
@@ -115,3 +119,9 @@ const struct AudioOutputPlugin multicast_output_plugin = {
 	nullptr,
 	nullptr,
 };
+
+// Local Variables:
+// c-basic-offset: 8
+// indent-tabs-mode: t
+// compile-command: "make -C ../../.."
+// End:
