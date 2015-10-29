@@ -27,6 +27,13 @@
 #include "../Timer.hxx"
 #include "SoundSender.hh"
 
+#define BILLION static_cast<const SoundSender::Clock::nsec_t>(1000000000)
+#define MULTICAST_AUDIO_FORMAT SampleFormat::S16
+#define MULTICAST_AUDIO_FORMAT_BYTES_PER_SAMPLE 2U
+#define MULTICAST_CHANNELS 2U
+#define MULTICAST_SAMPLERATE 48000U
+#define MULTICAST_BLOCK_SIZE 256U
+
 class MulticastOutput {
 	friend struct AudioOutputWrapper<MulticastOutput>;
 
@@ -49,13 +56,14 @@ public:
 	static MulticastOutput *Create(const ConfigBlock &block, Error &error);
 
 	bool Open(AudioFormat &audio_format, gcc_unused Error &error) {
-		if (audio_format.format != SampleFormat::S16)
+		if (audio_format.format != MULTICAST_AUDIO_FORMAT)
 			return false;
-		if (audio_format.channels != 2U)
+		if (audio_format.channels != MULTICAST_CHANNELS)
 			return false;
-		if (audio_format.sample_rate != 48000U)
+		if (audio_format.sample_rate != MULTICAST_SAMPLERATE)
 			return false;
-		SoundSender::Clock::nsec_t period = 256000000000 / 48000;
+		SoundSender::Clock::nsec_t period =
+			BILLION * MULTICAST_BLOCK_SIZE / MULTICAST_SAMPLERATE;
 		pacer = new SoundSender::Pacer(SoundSender::Clock{},
 					       period,
 					       period/2);
@@ -73,14 +81,18 @@ public:
 
 	size_t Play(gcc_unused const void *chunk, size_t size,
 		    gcc_unused Error &error) {
-		if ((size + incomplete_data_bytes) < (2*2*256)) {
+		if ((size + incomplete_data_bytes) <
+		    (MULTICAST_CHANNELS * MULTICAST_BLOCK_SIZE *
+		     MULTICAST_AUDIO_FORMAT_BYTES_PER_SAMPLE)) {
 			incomplete_data_bytes += size;
 			return size;
 		}
 		unsigned old_incomplete_data_bytes = incomplete_data_bytes;
 	        incomplete_data_bytes = 0;
 		pacer->trigger();
-		return 2*2*256 - old_incomplete_data_bytes;
+		return MULTICAST_CHANNELS * MULTICAST_BLOCK_SIZE *
+			MULTICAST_AUDIO_FORMAT_BYTES_PER_SAMPLE
+			- old_incomplete_data_bytes;
 	}
 
 	void Cancel() {
