@@ -34,6 +34,12 @@ For more information, please refer to <http://unlicense.org>
 #include <stdint.h> // for int64_t in Clock declaration
 #include <time.h>   // for Clock implementation
 #include <algorithm>// for std::min in Pacer implementation
+#include <string.h> // for memcpy in Multicaster implementation
+
+#define BILLION static_cast<const SoundSender::Clock::nsec_t>(1000000000)
+#define MULTICAST_CHANNELS 2U
+#define MULTICAST_SAMPLERATE 48000U
+#define MULTICAST_BLOCK_SIZE 256U
 
 namespace SoundSender {
 
@@ -75,7 +81,7 @@ namespace SoundSender {
     Clock::nsec_t get_period() const {
       return period;
     }
-    void trigger() {
+    Clock::nsec_t trigger() {
       switch (get_state()) {
       case WAITING:
       case OVERDUE:
@@ -84,6 +90,7 @@ namespace SoundSender {
       default:
         last_trigger_time = clock.get_nsec();
       }
+      return last_trigger_time;
     }
     Pacer(Clock clock, 
           Clock::nsec_t ns = Clock::nsec_t(256) * 1000000000 / 48000,
@@ -96,6 +103,30 @@ namespace SoundSender {
   };
 
   Pacer::State operator++(Pacer::State & s);
+
+  // Network packet declaration
+  struct NetworkPacket {
+    char magic[4];
+    uint32_t protocol_version;
+    uint32_t stream_id;
+    uint32_t packet_number;
+    Clock::nsec_t audible_time;
+    int16_t audio[MULTICAST_BLOCK_SIZE][MULTICAST_CHANNELS];
+  };
+
+  // Multicaster declaration
+  class Multicaster {
+    Pacer pacer;
+    Clock::nsec_t transmission_gap;
+    NetworkPacket packet;
+    // TODO: store network target address
+  public:
+    Multicaster(std::string address, uint16_t port,
+                Clock::nsec_t gap = 500000000);
+    Clock::nsec_t get_sleeptime() const
+    { return pacer.get_sleeptime(); }
+    void play(int16_t audio[MULTICAST_BLOCK_SIZE][MULTICAST_CHANNELS]);
+  };
 
   // Clock implementation
   Clock::nsec_t Clock::get_nsec() const {
@@ -121,6 +152,32 @@ namespace SoundSender {
   Pacer::State operator++(Pacer::State & s) {
     return s = static_cast<Pacer::State>(s+1);
   }
+
+  // Multicaster implementation
+  Multicaster::Multicaster(std::string address,
+                           uint16_t port,
+                           Clock::nsec_t gap)
+    : pacer(Clock{},
+            BILLION * MULTICAST_BLOCK_SIZE / MULTICAST_SAMPLERATE,
+            BILLION * MULTICAST_BLOCK_SIZE / MULTICAST_SAMPLERATE / 2),
+      transmission_gap(gap),
+      packet{{'M','R','A','h'}, // magic
+             0, // protocol_version;
+             port, //  stream_id;
+             0, // packet_number;
+             0, // audible time
+             {}} // audio
+  {
+  }
+  void Multicaster::play(int16_t 
+                         audio[MULTICAST_BLOCK_SIZE][MULTICAST_CHANNELS])
+  {
+    ++packet.packet_number;
+    packet.audible_time = pacer.trigger() + transmission_gap;
+    memcpy(&packet.audio[0][0], &audio[0][0], sizeof(audio));
+    // TODO: network transmission here
+  }
+
 }
 
 #endif

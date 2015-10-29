@@ -27,12 +27,8 @@
 #include "../Timer.hxx"
 #include "SoundSender.hh"
 
-#define BILLION static_cast<const SoundSender::Clock::nsec_t>(1000000000)
 #define MULTICAST_AUDIO_FORMAT SampleFormat::S16
 #define MULTICAST_AUDIO_FORMAT_BYTES_PER_SAMPLE 2U
-#define MULTICAST_CHANNELS 2U
-#define MULTICAST_SAMPLERATE 48000U
-#define MULTICAST_BLOCK_SIZE 256U
 
 class MulticastOutput {
 	friend struct AudioOutputWrapper<MulticastOutput>;
