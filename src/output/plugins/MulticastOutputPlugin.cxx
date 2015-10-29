@@ -68,7 +68,7 @@ public:
 	}
 
 	unsigned Delay() const {
-		return pacer->get_sleeptime();
+		return pacer->get_sleeptime() / 1000000;
 	}
 
 	size_t Play(gcc_unused const void *chunk, size_t size,
