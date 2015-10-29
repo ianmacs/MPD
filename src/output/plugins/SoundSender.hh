@@ -111,7 +111,7 @@ namespace SoundSender {
     uint32_t stream_id;
     uint32_t packet_number;
     Clock::nsec_t audible_time;
-    int16_t audio[MULTICAST_BLOCK_SIZE][MULTICAST_CHANNELS];
+    int16_t audio[MULTICAST_BLOCK_SIZE * MULTICAST_CHANNELS];
   };
 
   // Multicaster declaration
@@ -125,7 +125,7 @@ namespace SoundSender {
                 Clock::nsec_t gap = 500000000);
     Clock::nsec_t get_sleeptime() const
     { return pacer.get_sleeptime(); }
-    void play(int16_t audio[MULTICAST_BLOCK_SIZE][MULTICAST_CHANNELS]);
+    void play(int16_t audio[MULTICAST_BLOCK_SIZE * MULTICAST_CHANNELS]);
   };
 
   // Clock implementation
@@ -169,12 +169,11 @@ namespace SoundSender {
              {}} // audio
   {
   }
-  void Multicaster::play(int16_t 
-                         audio[MULTICAST_BLOCK_SIZE][MULTICAST_CHANNELS])
+  void Multicaster::play(int16_t audio[MULTICAST_BLOCK_SIZE*MULTICAST_CHANNELS])
   {
     ++packet.packet_number;
     packet.audible_time = pacer.trigger() + transmission_gap;
-    memcpy(&packet.audio[0][0], &audio[0][0], sizeof(audio));
+    memcpy(packet.audio, audio, sizeof(packet.audio));
     // TODO: network transmission here
   }
 
