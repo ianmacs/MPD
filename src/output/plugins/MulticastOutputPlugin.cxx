@@ -35,13 +35,14 @@ class MulticastOutput {
 
 	AudioOutput base;
 
-	SoundSender::Pacer *pacer;
+	SoundSender::Multicaster *caster;
 
 	unsigned incomplete_data_bytes;
+	int16_t audio[MULTICAST_BLOCK_SIZE * MULTICAST_CHANNELS];
 public:
 	MulticastOutput()
 		: base(multicast_output_plugin),
-		  pacer(0),
+		  caster(0),
 		  incomplete_data_bytes(0)
 	{}
 
@@ -58,37 +59,37 @@ public:
 			return false;
 		if (audio_format.sample_rate != MULTICAST_SAMPLERATE)
 			return false;
-		SoundSender::Clock::nsec_t period =
-			BILLION * MULTICAST_BLOCK_SIZE / MULTICAST_SAMPLERATE;
-		pacer = new SoundSender::Pacer(SoundSender::Clock{},
-					       period,
-					       period/2);
+		caster = new SoundSender::Multicaster("226.125.44.170",48221);
 		return true;
 	}
 
 	void Close() {
-		delete pacer;
-		pacer = 0;
+		delete caster;
+		caster = 0;
 	}
 
 	unsigned Delay() const {
-		return pacer->get_sleeptime() / 1000000;
+		return caster->get_sleeptime() / 1000000;
 	}
 
 	size_t Play(gcc_unused const void *chunk, size_t size,
 		    gcc_unused Error &error) {
-		if ((size + incomplete_data_bytes) <
-		    (MULTICAST_CHANNELS * MULTICAST_BLOCK_SIZE *
-		     MULTICAST_AUDIO_FORMAT_BYTES_PER_SAMPLE)) {
-			incomplete_data_bytes += size;
-			return size;
+		bool buffer_full = true;
+		size_t bytes_to_copy = sizeof(audio) - incomplete_data_bytes;
+		if (size < bytes_to_copy) {
+			buffer_full = false;
+			bytes_to_copy = size;
 		}
-		unsigned old_incomplete_data_bytes = incomplete_data_bytes;
-	        incomplete_data_bytes = 0;
-		pacer->trigger();
-		return MULTICAST_CHANNELS * MULTICAST_BLOCK_SIZE *
-			MULTICAST_AUDIO_FORMAT_BYTES_PER_SAMPLE
-			- old_incomplete_data_bytes;
+		memcpy(reinterpret_cast<char*>(audio) + incomplete_data_bytes,
+		       chunk, 
+		       bytes_to_copy);
+		if (buffer_full) {
+			incomplete_data_bytes = 0;
+			caster->play(audio);
+		} else {
+			incomplete_data_bytes += bytes_to_copy;
+		}
+		return bytes_to_copy;
 	}
 
 	void Cancel() {
