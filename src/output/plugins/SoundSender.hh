@@ -35,6 +35,14 @@ For more information, please refer to <http://unlicense.org>
 #include <time.h>   // for Clock implementation
 #include <algorithm>// for std::min in Pacer implementation
 #include <string.h> // for memcpy in Multicaster implementation
+#include <asio.hpp>
+
+#ifdef BOOST_NO_EXCEPTIONS
+namespace boost {
+  void throw_exception(std::exception const & e) {
+  }
+}
+#endif
 
 #define BILLION static_cast<const SoundSender::Clock::nsec_t>(1000000000)
 #define MULTICAST_CHANNELS 2U
@@ -119,7 +127,10 @@ namespace SoundSender {
     Pacer pacer;
     Clock::nsec_t transmission_gap;
     NetworkPacket packet;
-    // TODO: store network target address
+    asio::io_service asio_service;
+    asio::ip::udp::endpoint endpoint;
+    asio::ip::udp::socket socket;
+    asio::const_buffers_1 buffer;
   public:
     Multicaster(std::string address, uint16_t port,
                 Clock::nsec_t gap = 500000000);
@@ -166,7 +177,10 @@ namespace SoundSender {
              port, //  stream_id;
              0, // packet_number;
              0, // audible time
-             {}} // audio
+             {}}, // audio
+      endpoint(asio::ip::address::from_string(address), port),
+      socket(asio_service, endpoint.protocol()),
+      buffer(&packet, sizeof(packet))
   {
   }
   void Multicaster::play(int16_t audio[MULTICAST_BLOCK_SIZE*MULTICAST_CHANNELS])
@@ -174,9 +188,15 @@ namespace SoundSender {
     ++packet.packet_number;
     packet.audible_time = pacer.trigger() + transmission_gap;
     memcpy(packet.audio, audio, sizeof(packet.audio));
-    // TODO: network transmission here
+    socket.send_to(buffer, endpoint);
   }
 
 }
 
 #endif
+
+// Local Variables:
+// c-basic-offset: 2
+// indent-tabs-mode: nil
+// compile-command: "make -C ../../.."
+// End:
