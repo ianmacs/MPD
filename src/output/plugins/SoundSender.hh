@@ -40,6 +40,7 @@ For more information, please refer to <http://unlicense.org>
 #ifdef BOOST_NO_EXCEPTIONS
 namespace boost {
   void throw_exception(std::exception const & e) {
+    (void) e;
   }
 }
 #endif
@@ -114,10 +115,10 @@ namespace SoundSender {
 
   // Network packet declaration
   struct NetworkPacket {
-    char magic[4];
+    char magic[8];
     uint32_t protocol_version;
     uint32_t stream_id;
-    uint32_t packet_number;
+    uint64_t packet_number;
     Clock::nsec_t audible_time;
     int16_t audio[MULTICAST_BLOCK_SIZE * MULTICAST_CHANNELS];
   };
@@ -172,8 +173,8 @@ namespace SoundSender {
             BILLION * MULTICAST_BLOCK_SIZE / MULTICAST_SAMPLERATE,
             BILLION * MULTICAST_BLOCK_SIZE / MULTICAST_SAMPLERATE / 2),
       transmission_gap(gap),
-      packet{{'M','R','A','h'}, // magic
-             0, // protocol_version;
+      packet{{'M','R','A','I','a','n','M','C'}, // magic
+             1, // protocol_version;
              port, //  stream_id;
              0, // packet_number;
              0, // audible time
